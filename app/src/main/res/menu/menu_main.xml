@@ -2,8 +2,39 @@
       xmlns:app="http://schemas.android.com/apk/res-auto"
       xmlns:tools="http://schemas.android.com/tools"
       tools:context=".MainActivity">
-    <item android:id="@+id/action_settings"
-          android:title="@string/action_settings"
+
+      <item android:id="@+id/action_load"
+          android:title="Load Image"
           android:orderInCategory="100"
           app:showAsAction="never"/>
+
+      <item android:id="@+id/action_camera"
+            android:title="Camera Image"
+            android:orderInCategory="101"
+            app:showAsAction="never"/>
+
+      <item android:id="@+id/action_save"
+            android:title="Save Image"
+            android:orderInCategory="102"
+            app:showAsAction="never"/>
+
+      <item android:id="@+id/action_swirl"
+            android:title="Apply Swirl"
+            android:orderInCategory="103"
+            app:showAsAction="never"/>
+
+      <item android:id="@+id/action_bulge"
+            android:title="Apply Bulge"
+            android:orderInCategory="104"
+            app:showAsAction="never"/>
+
+      <item android:id="@+id/action_fisheye"
+            android:title="Apply Fisheye"
+            android:orderInCategory="105"
+            app:showAsAction="never"/>
+
+      <item android:id="@+id/action_undo"
+            android:title="Undo Warp"
+            android:orderInCategory="106"
+            app:showAsAction="never"/>
 </menu>

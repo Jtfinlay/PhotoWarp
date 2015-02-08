@@ -18,8 +18,8 @@ android {
 
     defaultConfig {
         applicationId "ca.finlay.photowarp.app"
-        minSdkVersion 9
-        targetSdkVersion 21
+        minSdkVersion 17
+        targetSdkVersion 17
         versionCode 1
         versionName "1.0"
     }
