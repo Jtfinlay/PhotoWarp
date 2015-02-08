@@ -142,7 +142,8 @@ public class MainActivity extends ActionBarActivity {
         script.set_width(_bitMap.getWidth());
         script.bind_input(tInAllocation);
         script.bind_output(tOutAllocation);
-        script.invoke_XXX(50, 50);
+        script.invoke_swirl(.001f);
+//        script.invoke_bulge();
         tOutAllocation.copyTo(_bitMap);
     }
 
