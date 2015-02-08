@@ -33,7 +33,6 @@ public abstract class AbstractFilter extends Observable {
         _script.set_height(_orig.getHeight());
         _script.set_width(_orig.getWidth());
         _script.bind_input(_in);
-        _script.bind_output(_out);
     }
 
     public Allocation getResult()

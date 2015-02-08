@@ -20,7 +20,7 @@ public class SwirlFilter extends AbstractFilter {
 
     @Override
     protected void invoke() {
-        _script.invoke_swirl(.001f);
+        _script.forEach_swirl(_in, _out);
     }
 
 }

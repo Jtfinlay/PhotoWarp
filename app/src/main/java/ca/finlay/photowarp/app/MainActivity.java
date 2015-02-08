@@ -27,9 +27,7 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
 
     private Bitmap _bitMap;
     private Button _btnLoad, _btnCamera, _btnSave, _btnDiscard;
-    private FilterTask _filterTask;
     private ImageView _imageView;
-    private ProgressDialog _progress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,7 +68,7 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
             public void onClick(View v) {
                 _bitMap = null;
                 _imageView.setImageBitmap(_bitMap);
-                changeView();
+                updateView();
             }
         });
 
@@ -134,13 +132,7 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
 
     private void applyFilter(AbstractFilter filter) {
 
-        _filterTask = new FilterTask();
-        _progress = new ProgressDialog(this);
-        _progress.setMessage(filter.getProgressMessage());
-        _progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        _progress.setCancelable(false);
-        _progress.show();
-        _filterTask.execute(filter, this, _bitMap);
+        (new FilterTask()).execute(filter, this, _bitMap);
     }
 
     /**
@@ -173,10 +165,10 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         _bitMap = bm;
         _imageView.setImageBitmap(_bitMap);
 
-        changeView();
+        updateView();
     }
 
-    private void changeView()
+    private void updateView()
     {
         if (_bitMap != null)
         {
@@ -194,18 +186,9 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
     }
 
     @Override
-    public void progressUpdate(double value) {
-        _progress.setProgress((int) value);
-    }
-
-    @Override
     public void onComplete(Allocation result) {
-        _progress.setMessage("Filter Complete!");
-        Log.v("MainActivity", "onComplete");
-        _progress.dismiss();
         result.copyTo(_bitMap);
         _imageView.setImageBitmap(_bitMap);
-        changeView();
-
+        updateView();
     }
 }

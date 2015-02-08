@@ -19,6 +19,6 @@ public class BulgeFilter extends AbstractFilter {
 
     @Override
     protected void invoke() {
-        _script.invoke_bulge(2.0f);
+        _script.forEach_bulge(_in, _out);
     }
 }

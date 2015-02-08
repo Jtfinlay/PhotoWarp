@@ -19,6 +19,6 @@ public class FisheyeFilter extends AbstractFilter {
 
     @Override
     protected void invoke() {
-        _script.invoke_fisheye(2.0f);
+        _script.forEach_fisheye(_in, _out);
     }
 }

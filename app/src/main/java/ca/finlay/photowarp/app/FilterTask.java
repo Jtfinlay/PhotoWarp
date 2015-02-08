@@ -27,7 +27,6 @@ public class FilterTask extends AsyncTask<Object, Double, Allocation> implements
     @Override
     protected void onProgressUpdate(Double... values)
     {
-        _parent.progressUpdate(values[0]);
         super.onProgressUpdate(values);
     }
 
