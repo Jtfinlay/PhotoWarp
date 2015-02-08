@@ -1,12 +1,12 @@
 package ca.finlay.photowarp.app;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.renderscript.Allocation;
-import android.renderscript.RenderScript;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,16 +20,16 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class MainActivity extends ActionBarActivity {
-
-    private static final String TAG = "MAIN_ACTIVITY";
+public class MainActivity extends ActionBarActivity implements FilterListener {
 
     private static final int LOAD_REQUEST_CODE = 1;
     private static final int CAMERA_REQUEST_CODE= 2;
 
     private Bitmap _bitMap;
     private Button _btnLoad, _btnCamera, _btnSave, _btnDiscard;
+    private FilterTask _filterTask;
     private ImageView _imageView;
+    private ProgressDialog _progress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,7 +70,7 @@ public class MainActivity extends ActionBarActivity {
             public void onClick(View v) {
                 _bitMap = null;
                 _imageView.setImageBitmap(_bitMap);
-                resetView();
+                changeView();
             }
         });
 
@@ -116,13 +116,13 @@ public class MainActivity extends ActionBarActivity {
             case R.id.action_save:
                 break;
             case R.id.action_swirl:
-                swirl();
+                applyFilter(new SwirlFilter(this, _bitMap));
                 break;
             case R.id.action_bulge:
-                bulge();
+                applyFilter(new BulgeFilter(this, _bitMap));
                 break;
             case R.id.action_fisheye:
-                fisheye();
+                applyFilter(new FisheyeFilter(this, _bitMap));
                 break;
             case R.id.action_undo:
                 break;
@@ -132,55 +132,16 @@ public class MainActivity extends ActionBarActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    private void swirl()
-    {
-        RenderScript rs = RenderScript.create(this);
+    private void applyFilter(AbstractFilter filter) {
 
-        Allocation tInAllocation = Allocation.createFromBitmap(rs, _bitMap, Allocation.MipmapControl.MIPMAP_NONE,Allocation.USAGE_SCRIPT);
-        Allocation tOutAllocation = Allocation.createTyped(rs, tInAllocation.getType());
-
-        ScriptC_transform script = new ScriptC_transform(rs, getResources(), R.raw.transform);
-        script.set_height(_bitMap.getHeight());
-        script.set_width(_bitMap.getWidth());
-        script.bind_input(tInAllocation);
-        script.bind_output(tOutAllocation);
-        script.invoke_swirl(.001f);
-        tOutAllocation.copyTo(_bitMap);
+        _filterTask = new FilterTask();
+        _progress = new ProgressDialog(this);
+        _progress.setMessage(filter.getProgressMessage());
+        _progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        _progress.setCancelable(false);
+        _progress.show();
+        _filterTask.execute(filter, this, _bitMap);
     }
-
-    private void bulge()
-    {
-        RenderScript rs = RenderScript.create(this);
-
-        Allocation tInAllocation = Allocation.createFromBitmap(rs, _bitMap, Allocation.MipmapControl.MIPMAP_NONE,Allocation.USAGE_SCRIPT);
-        Allocation tOutAllocation = Allocation.createTyped(rs, tInAllocation.getType());
-
-        ScriptC_transform script = new ScriptC_transform(rs, getResources(), R.raw.transform);
-        script.set_height(_bitMap.getHeight());
-        script.set_width(_bitMap.getWidth());
-        script.bind_input(tInAllocation);
-        script.bind_output(tOutAllocation);
-        script.invoke_bulge(2.0f);
-        tOutAllocation.copyTo(_bitMap);
-    }
-
-
-    private void fisheye()
-    {
-        RenderScript rs = RenderScript.create(this);
-
-        Allocation tInAllocation = Allocation.createFromBitmap(rs, _bitMap, Allocation.MipmapControl.MIPMAP_NONE,Allocation.USAGE_SCRIPT);
-        Allocation tOutAllocation = Allocation.createTyped(rs, tInAllocation.getType());
-
-        ScriptC_transform script = new ScriptC_transform(rs, getResources(), R.raw.transform);
-        script.set_height(_bitMap.getHeight());
-        script.set_width(_bitMap.getWidth());
-        script.bind_input(tInAllocation);
-        script.bind_output(tOutAllocation);
-        script.invoke_fisheye(2.0f);
-        tOutAllocation.copyTo(_bitMap);
-    }
-
 
     /**
      * Load image from uri and draw to the ImageView
@@ -212,11 +173,10 @@ public class MainActivity extends ActionBarActivity {
         _bitMap = bm;
         _imageView.setImageBitmap(_bitMap);
 
-        resetView();
-
+        changeView();
     }
 
-    private void resetView()
+    private void changeView()
     {
         if (_bitMap != null)
         {
@@ -231,5 +191,21 @@ public class MainActivity extends ActionBarActivity {
             _btnSave.setVisibility(View.GONE);
             _btnDiscard.setVisibility(View.GONE);
         }
+    }
+
+    @Override
+    public void progressUpdate(double value) {
+        _progress.setProgress((int) value);
+    }
+
+    @Override
+    public void onComplete(Allocation result) {
+        _progress.setMessage("Filter Complete!");
+        Log.v("MainActivity", "onComplete");
+        _progress.dismiss();
+        result.copyTo(_bitMap);
+        _imageView.setImageBitmap(_bitMap);
+        changeView();
+
     }
 }
