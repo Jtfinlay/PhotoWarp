@@ -119,8 +119,10 @@ public class MainActivity extends ActionBarActivity {
                 swirl();
                 break;
             case R.id.action_bulge:
+                bulge();
                 break;
             case R.id.action_fisheye:
+                fisheye();
                 break;
             case R.id.action_undo:
                 break;
@@ -143,9 +145,42 @@ public class MainActivity extends ActionBarActivity {
         script.bind_input(tInAllocation);
         script.bind_output(tOutAllocation);
         script.invoke_swirl(.001f);
-//        script.invoke_bulge();
         tOutAllocation.copyTo(_bitMap);
     }
+
+    private void bulge()
+    {
+        RenderScript rs = RenderScript.create(this);
+
+        Allocation tInAllocation = Allocation.createFromBitmap(rs, _bitMap, Allocation.MipmapControl.MIPMAP_NONE,Allocation.USAGE_SCRIPT);
+        Allocation tOutAllocation = Allocation.createTyped(rs, tInAllocation.getType());
+
+        ScriptC_transform script = new ScriptC_transform(rs, getResources(), R.raw.transform);
+        script.set_height(_bitMap.getHeight());
+        script.set_width(_bitMap.getWidth());
+        script.bind_input(tInAllocation);
+        script.bind_output(tOutAllocation);
+        script.invoke_bulge(2.0f);
+        tOutAllocation.copyTo(_bitMap);
+    }
+
+
+    private void fisheye()
+    {
+        RenderScript rs = RenderScript.create(this);
+
+        Allocation tInAllocation = Allocation.createFromBitmap(rs, _bitMap, Allocation.MipmapControl.MIPMAP_NONE,Allocation.USAGE_SCRIPT);
+        Allocation tOutAllocation = Allocation.createTyped(rs, tInAllocation.getType());
+
+        ScriptC_transform script = new ScriptC_transform(rs, getResources(), R.raw.transform);
+        script.set_height(_bitMap.getHeight());
+        script.set_width(_bitMap.getWidth());
+        script.bind_input(tInAllocation);
+        script.bind_output(tOutAllocation);
+        script.invoke_fisheye(2.0f);
+        tOutAllocation.copyTo(_bitMap);
+    }
+
 
     /**
      * Load image from uri and draw to the ImageView

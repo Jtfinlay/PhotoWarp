@@ -10,6 +10,8 @@ int width;
 int height;
 
 void swirl(float);
+void bulge(float);
+void fisheye(float);
 static uchar4 getPixelAt(int, int);
 void setPixelAt(int, int, uchar4);
 
@@ -45,10 +47,8 @@ void swirl(float factor)
 			}
 
 			radius = sqrt( relX*relX + relY*relY);
-//			new_angle = angle + 1.0f /(factor * radius + (4.0f/C_PI));
 			new_angle = angle + (factor * radius);
 
-			//rsDebug("angle, new_angle", angle, new_angle);
 
 			srcX = (int)(floor(radius * cos(new_angle)+0.5f));
 			srcY = (int)(floor(radius * sin(new_angle)+0.5f));
@@ -56,37 +56,78 @@ void swirl(float factor)
 			srcY += cY;
 			srcY = height - srcY;
 
-			//rsDebug("Differences", (srcX-j), (srcY-i));
 			setPixelAt(j, i, getPixelAt(srcX, srcY));
 		}
 	}
 }
 
-void bulge()
+void bulge(float factor)
 {
-	int x, y, newX, newY;
-	float r, a, rn, relX, relY;
+	float x, y;
+	float r, a, rn, cX, cY;
+
+	float xdist, ydist;
+	float srcX, srcY;
+
+	cX = (float) width / 2.0f;
+   	cY = (float) height / 2.0f;
 
 	for (y = 0; y < height; y++)
 	{
-		relY = (height / 2.0f);
 		for (x = 0; x < width; x++)
 		{
-			relX = (width / 2.0f);
+			xdist = ((float) x / (float)width);
+			ydist = ((float) y / (float)height);
 
-			r = sqrt( relX * relX + relY * relY );
-			a = atan( fabs(relY) / fabs(relX));
+			r = sqrt(pow((xdist-0.5f), 2) + pow((ydist-0.5f), 2));
+			a = atan2((xdist-0.5f), (ydist-0.5f));
+			rn = pow(r,factor)/0.5f;
 
-			rn = pow(r, 2.5f) / 0.5f;
+			srcX = rn * sin(a) + 0.5f;
+			srcY = rn * cos(a) + 0.5f;
+			srcX *= (float) width;
+			srcY *= (float) height;
 
-			newX = (int) (rn * cos(a) + relX);
-			newY = (int) (rn * sin(a) + relY);
-
-            setPixelAt(newX, newY, getPixelAt(x,y));
+			setPixelAt(x, y, getPixelAt((int)srcX, (int)srcY));
 		}
 	}
-
 }
+
+void fisheye(float factor)
+{
+	float ny, nx, r, nr;
+	float theta, nxn, nyn;
+	int x, y, x2, y2;
+
+	for (y = 0; y < height; y++)
+	{
+		ny = ((2.0f * y) / height) - 1.0f;
+		for (x = 0; x < width; x++)
+		{
+			nx = ((2.0f * x) / width) - 1.0f;
+			r = sqrt(nx*nx + ny*ny);
+
+			if (0.0f <= r && r <= 1.0)
+			{
+				nr = (r + (1.0f - nr)) / factor;
+
+				if (nr <= 1.0)
+				{
+                 	theta = atan2(ny, nx);
+                 	nxn = nr * cos(theta);
+                 	nyn = nr * sin(theta);
+
+                 	x2 = (int) (((nxn+1)*width) / 2.0f);
+                 	y2 = (int) (((nyn+1)*height) / 2.0f);
+
+                 	setPixelAt(x, y, getPixelAt(x2, y2));
+
+				}
+			}
+		}
+	}
+}
+
 
 
 //a convenience method to clamp getting pixels into the image
