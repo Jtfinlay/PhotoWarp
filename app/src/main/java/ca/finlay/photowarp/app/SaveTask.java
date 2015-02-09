@@ -7,6 +7,7 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.provider.MediaStore;
+import android.renderscript.Allocation;
 import android.util.Log;
 import android.widget.Spinner;
 import android.widget.Toast;
@@ -14,6 +15,7 @@ import android.widget.Toast;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Observable;
 import java.util.UUID;
 
 /**
@@ -22,6 +24,7 @@ import java.util.UUID;
 public class SaveTask extends AsyncTask<Object, Double, Boolean> {
 
     private Context _c;
+    private SaveTaskListener _parent;
 
     public SaveTask(Context c) {
         _c = c;
@@ -30,6 +33,7 @@ public class SaveTask extends AsyncTask<Object, Double, Boolean> {
     @Override
     protected Boolean doInBackground(Object... params) {
         Bitmap image = (Bitmap) params[0];
+        _parent = (SaveTaskListener) params[1];
 
         try
         {
@@ -57,5 +61,11 @@ public class SaveTask extends AsyncTask<Object, Double, Boolean> {
         Log.v("SaveTask", "Problem saving image.");
         return false;
 
+    }
+
+    @Override
+    protected void onPostExecute(Boolean result)
+    {
+        _parent.onSaveComplete(result);
     }
 }

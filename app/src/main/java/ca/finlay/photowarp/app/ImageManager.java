@@ -19,11 +19,6 @@ public class ImageManager {
     public static final int LOAD_REQUEST_CODE = 1;
     public static final int CAMERA_REQUEST_CODE= 2;
 
-    public static final String APP_PATH = "/PHOTOWARP";
-
-    private LruCache<String, Bitmap> _cache;
-    private LinkedList<String> _cacheQueue;
-
     public static void LaunchDirectorySearch(Activity a)
     {
         Intent intent = new Intent();
@@ -39,47 +34,9 @@ public class ImageManager {
         a.startActivityForResult(cameraIntent, CAMERA_REQUEST_CODE);
     }
 
-    public static void SaveBitmap(Context c, Bitmap image)
+    public static void SaveBitmap(SaveTaskListener l, Context c, Bitmap image)
     {
-        (new SaveTask(c)).execute(image);
+        (new SaveTask(c)).execute(image, l);
     }
 
-    public void pushBitmapToCache(Bitmap bitmap)
-    {
-        // TODO - Maximum undos
-        String key = String.valueOf(UUID.randomUUID());
-        _cacheQueue.addFirst(key);
-        _cache.put(key, bitmap);
-    }
-
-    public Bitmap pullBitmapFromCache()
-    {
-        String key = _cacheQueue.pollFirst();
-        Bitmap result = _cache.get(key);
-        _cache.remove(key);
-
-        return result;
-    }
-
-    public void clearCache()
-    {
-        _cache.evictAll();
-        _cacheQueue = new LinkedList<String>();
-    }
-
-    public void createCache()
-    {
-        final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
-        final int cacheSize = maxMemory / 8;
-
-        _cacheQueue = new LinkedList<String>();
-
-       _cache = new LruCache<String, Bitmap> (cacheSize) {
-            @Override
-            protected int sizeOf(String key, Bitmap bitmap)
-            {
-                return bitmap.getByteCount() / 1024;
-            }
-        };
-    }
 }

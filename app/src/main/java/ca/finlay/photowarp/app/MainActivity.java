@@ -1,8 +1,12 @@
 package ca.finlay.photowarp.app;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.Image;
@@ -11,23 +15,31 @@ import android.renderscript.Allocation;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
+import android.view.*;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.LinkedList;
 
-public class MainActivity extends ActionBarActivity implements FilterListener {
+public class MainActivity extends ActionBarActivity implements FilterTaskListener, SaveTaskListener, SwiperListener {
 
-    private Bitmap _bitMap;
+
+    private static final int SETTINGS_ID = 4;
+
+    private LinkedList<Bitmap> _bitMap;
     private Button _btnLoad, _btnCamera, _btnSave, _btnDiscard;
+    private MenuItem _menuSettings, _menuLoad, _menuCamera,
+                     _menuSwirl, _menuBulge, _menuFisheye, _menuUndo;
     private ImageView _imageView;
-    private ImageManager _imageManager;
 
+    /**
+     * Setup views
+     * @param savedInstanceState
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -54,25 +66,26 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         _btnSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                  ImageManager.SaveBitmap(MainActivity.this, _bitMap);
+                Toast.makeText(MainActivity.this, "Saving... This could take a minute.", Toast.LENGTH_SHORT).show();
+                ImageManager.SaveBitmap(MainActivity.this, MainActivity.this, _bitMap.peek());
             }
         });
         _btnDiscard.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                _bitMap = null;
-                _imageView.setImageBitmap(_bitMap);
-                updateView();
+                discardImage();
             }
         });
+        _imageView.setOnTouchListener(new MyTouchListener(MainActivity.this));
 
-        _imageManager = new ImageManager();
-        _imageManager.createCache();
-
+        _bitMap = new LinkedList<Bitmap>();
         handleIntent();
 
     }
 
+    /**
+     * Handle intent from previous app
+     */
     private void handleIntent()
     {
         Intent intent = getIntent();
@@ -88,6 +101,12 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         loadImage(imageUri);
     }
 
+    /**
+     * Result from launched Activities.
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data)
     {
@@ -105,13 +124,30 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         }
     }
 
+    /**
+     * Get menu item views
+     * @param menu
+     * @return
+     */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.menu_main, menu);
+        _menuSettings = menu.findItem(R.id.settings);
+        _menuLoad = menu.findItem(R.id.action_load);
+        _menuCamera = menu.findItem(R.id.action_camera);
+        _menuSwirl = menu.findItem(R.id.action_swirl);
+        _menuBulge = menu.findItem(R.id.action_bulge);
+        _menuFisheye = menu.findItem(R.id.action_fisheye);
+        _menuUndo = menu.findItem(R.id.action_undo);
         return true;
     }
 
+    /**
+     * Handle menu item selection.
+     * @param item
+     * @return
+     */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle action bar item clicks here. The action bar will
@@ -121,23 +157,23 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
 
         switch (id)
         {
+            case R.id.settings:
+                startActivity(new Intent(this, SettingsActivity.class));
+                break;
             case R.id.action_load:
                 ImageManager.LaunchDirectorySearch(this);
                 break;
             case R.id.action_camera:
                 ImageManager.LaunchCamera(this);
                 break;
-            case R.id.action_save:
-                ImageManager.SaveBitmap(this, _bitMap);
-                break;
             case R.id.action_swirl:
-                applyFilter(new SwirlFilter(this, _bitMap));
+                applyFilter(new SwirlFilter(this, _bitMap.peek()));
                 break;
             case R.id.action_bulge:
-                applyFilter(new BulgeFilter(this, _bitMap));
+                applyFilter(new BulgeFilter(this, _bitMap.peek()));
                 break;
             case R.id.action_fisheye:
-                applyFilter(new FisheyeFilter(this, _bitMap));
+                applyFilter(new FisheyeFilter(this, _bitMap.peek()));
                 break;
             case R.id.action_undo:
                 undoFilter();
@@ -148,9 +184,13 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     * Apply filter asynchronously
+     * @param filter
+     */
     private void applyFilter(AbstractFilter filter)
     {
-        (new FilterTask()).execute(filter, this, _bitMap);
+        (new FilterTask(this, filter)).execute(this);
     }
 
     /**
@@ -178,48 +218,163 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         }
     }
 
+    /**
+     * Pop top image and apply previous.
+     */
     private void undoFilter()
     {
-        setBitmap(_imageManager.pullBitmapFromCache(), false);
-    }
-
-    private void setBitmap(Bitmap bm, boolean resetCache)
-    {
-        if (resetCache)
-        {
-            _imageManager.clearCache();
-        }
-        if (_bitMap != null)_imageManager.pushBitmapToCache(_bitMap);
-
-        _bitMap = bm;
-        _imageView.setImageBitmap(_bitMap);
-
+        _bitMap.pop();
+        _imageView.setImageBitmap(_bitMap.peek());
         updateView();
     }
 
+    /**
+     * Enable / disable buttons and menu items depending on loaded bitmaps.
+     */
     private void updateView()
     {
-        if (_bitMap != null)
+        if (_bitMap.peek() != null)
         {
             _btnLoad.setVisibility(View.GONE);
             _btnCamera.setVisibility(View.GONE);
             _btnSave.setVisibility(View.VISIBLE);
             _btnDiscard.setVisibility(View.VISIBLE);
+            _menuLoad.setEnabled(false);
+            _menuCamera.setEnabled(false);
+            _menuSwirl.setEnabled(true);
+            _menuFisheye.setEnabled(true);
+            _menuBulge.setEnabled(true);
         } else
         {
             _btnLoad.setVisibility(View.VISIBLE);
             _btnCamera.setVisibility(View.VISIBLE);
             _btnSave.setVisibility(View.GONE);
             _btnDiscard.setVisibility(View.GONE);
+            _menuLoad.setEnabled(true);
+            _menuCamera.setEnabled(true);
+            _menuSwirl.setEnabled(false);
+            _menuFisheye.setEnabled(false);
+            _menuBulge.setEnabled(false);
+        }
+        if (_bitMap.size() > 1)
+        {
+            _menuUndo.setEnabled(true);
+        } else
+        {
+            _menuUndo.setEnabled(false);
         }
     }
 
-    @Override
-    public void onComplete(Allocation result) {
-        if (_bitMap != null)_imageManager.pushBitmapToCache(_bitMap);
+    /**
+     * Set bitmap
+     * @param bm bitmap to add
+     * @param resetCache whether to reset the undo queue.
+     */
+    private void setBitmap(Bitmap bm, boolean resetCache)
+    {
+        pushBitmap(bm, resetCache);
+        _imageView.setImageBitmap(_bitMap.peek());
 
-        result.copyTo(_bitMap);
-        _imageView.setImageBitmap(_bitMap);
         updateView();
+    }
+
+    /**
+     * Add bitmap to undo queue. Checks whether hit max undos.
+     * @param bm bitmap to add
+     * @param resetCache whether to reset the undo queue.
+     */
+    public void pushBitmap(Bitmap bm, boolean resetCache)
+    {
+        if (resetCache)
+        {
+            _bitMap = new LinkedList<Bitmap>();
+        }
+        _bitMap.addFirst(bm);
+
+        SharedPreferences sharedPref = this.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES, Context.MODE_PRIVATE);
+        while (sharedPref.getInt(SettingsActivity.UNDO_SETTINGS, 5)+1 < _bitMap.size())
+        {
+            _bitMap.removeLast();
+        }
+    }
+
+    /**
+     * Discard undo queue and the active bitmap. Verifies with alert first.
+     */
+    private void discardImage()
+    {
+        new AlertDialog.Builder(this)
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .setTitle("Discard image")
+                .setMessage("Are you sure you want to discard?")
+                .setPositiveButton("Kill it!", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        _bitMap = new LinkedList<Bitmap>();
+                        _imageView.setImageBitmap(_bitMap.peek());
+                        updateView();
+                    }
+                })
+                .setNegativeButton("No", null)
+                .show();
+    }
+
+    /**
+     * Apply filter task complete.
+     * From FilterTaskListener
+     * @param result
+     */
+    @Override
+    public void onFilterComplete(Allocation result) {
+        Bitmap bm = _bitMap.peek().copy(Bitmap.Config.ARGB_8888, true);
+        result.copyTo(bm);
+        pushBitmap(bm, false);
+        _imageView.setImageBitmap(_bitMap.peek());
+        updateView();
+    }
+
+    /**
+     * Save bitmap task complete.
+     * From SaveTaskListener
+     * @param success:
+     */
+    @Override
+    public void onSaveComplete(boolean success) {
+        if (success)
+        {
+            Toast.makeText(MainActivity.this, "Save successful", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Swirl action from Touch events.
+     * From SwiperListener
+     */
+    @Override
+    public void onSwirl() {
+        if (!_menuSwirl.isEnabled()) return;
+        applyFilter(new SwirlFilter(this, _bitMap.peek()));
+    }
+
+    /**
+     * Bulge action from Touch events.
+     * From SwiperListener
+     */
+    @Override
+    public void onBulge() {
+        if (!_menuBulge.isEnabled()) return;
+        applyFilter(new BulgeFilter(this, _bitMap.peek()));
+
+    }
+
+    /**
+     * Fisheye action from Touch events
+     * From SwiperListener
+     */
+    @Override
+    public void onFisheye() {
+        if (!_menuFisheye.isEnabled()) return;
+        applyFilter(new FisheyeFilter(this, _bitMap.peek()));
+
     }
 }

@@ -1,5 +1,7 @@
 package ca.finlay.photowarp.app;
 
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.renderscript.Allocation;
@@ -7,21 +9,30 @@ import android.util.Log;
 
 import java.util.Observable;
 import java.util.Observer;
+import java.util.logging.Filter;
 
 /**
  * Created by James on 2/8/2015.
  */
 public class FilterTask extends AsyncTask<Object, Double, Allocation> implements Observer {
 
-    private FilterListener _parent;
+    private FilterTaskListener _parent;
+    private Context _c;
+    private ProgressDialog _pd;
+    private AbstractFilter _filter;
+
+    public FilterTask(Context c, AbstractFilter filter)
+    {
+        _c = c;
+        _filter = filter;
+        _filter.addObserver(this);
+    }
 
     @Override
     protected Allocation doInBackground(Object... params) {
-        AbstractFilter filter = (AbstractFilter) params[0];
-        _parent = (FilterListener) params[1];
-        filter.addObserver(this);
-        filter.invoke();
-        return filter.getResult();
+        _parent = (FilterTaskListener) params[0];
+        _filter.invoke();
+        return _filter.getResult();
     }
 
     @Override
@@ -31,9 +42,20 @@ public class FilterTask extends AsyncTask<Object, Double, Allocation> implements
     }
 
     @Override
+    protected void onPreExecute()
+    {
+        _pd = new ProgressDialog(_c);
+        _pd.setMessage(_filter.getProgressMessage() + " -- Could be slow if also saving.");
+        _pd.setCancelable(false);
+        _pd.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+        _pd.show();
+    }
+
+    @Override
     protected void onPostExecute(Allocation result)
     {
-        _parent.onComplete(result);
+        _pd.dismiss();
+        _parent.onFilterComplete(result);
     }
 
     @Override
