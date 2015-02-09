@@ -5,6 +5,7 @@ import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.Image;
 import android.net.Uri;
 import android.renderscript.Allocation;
 import android.support.v7.app.ActionBarActivity;
@@ -22,12 +23,10 @@ import java.io.InputStream;
 
 public class MainActivity extends ActionBarActivity implements FilterListener {
 
-    private static final int LOAD_REQUEST_CODE = 1;
-    private static final int CAMERA_REQUEST_CODE= 2;
-
     private Bitmap _bitMap;
     private Button _btnLoad, _btnCamera, _btnSave, _btnDiscard;
     private ImageView _imageView;
+    private ImageManager _imageManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,24 +42,19 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         _btnLoad.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent();
-                intent.setAction(Intent.ACTION_GET_CONTENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType("image/*");
-                startActivityForResult(intent, LOAD_REQUEST_CODE);
+                ImageManager.LaunchDirectorySearch(MainActivity.this);
             }
         });
         _btnCamera.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent cameraIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-                startActivityForResult(cameraIntent, CAMERA_REQUEST_CODE);
+                ImageManager.LaunchCamera(MainActivity.this);
             }
         });
         _btnSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                  // TODO - Save bitmap
+                  ImageManager.SaveBitmap(MainActivity.this, _bitMap);
             }
         });
         _btnDiscard.setOnClickListener(new View.OnClickListener() {
@@ -72,6 +66,26 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
             }
         });
 
+        _imageManager = new ImageManager();
+        _imageManager.createCache();
+
+        handleIntent();
+
+    }
+
+    private void handleIntent()
+    {
+        Intent intent = getIntent();
+        String action = intent.getAction();
+        String type = intent.getType();
+
+        if (!Intent.ACTION_VIEW.equals(action) && !Intent.ACTION_EDIT.equals(action)) return;
+        if (!type.startsWith("image/")) return;
+
+        Uri imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        if (imageUri == null) return;
+
+        loadImage(imageUri);
     }
 
     @Override
@@ -82,11 +96,11 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
 
         switch (requestCode)
         {
-            case LOAD_REQUEST_CODE:
+            case ImageManager.LOAD_REQUEST_CODE:
                 loadImage(data.getData());
                 break;
-            case CAMERA_REQUEST_CODE:
-                setBitmap((Bitmap) data.getExtras().get("data"));
+            case ImageManager.CAMERA_REQUEST_CODE:
+                setBitmap((Bitmap) data.getExtras().get("data"), true);
                 break;
         }
     }
@@ -108,10 +122,13 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         switch (id)
         {
             case R.id.action_load:
+                ImageManager.LaunchDirectorySearch(this);
                 break;
             case R.id.action_camera:
+                ImageManager.LaunchCamera(this);
                 break;
             case R.id.action_save:
+                ImageManager.SaveBitmap(this, _bitMap);
                 break;
             case R.id.action_swirl:
                 applyFilter(new SwirlFilter(this, _bitMap));
@@ -123,6 +140,7 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
                 applyFilter(new FisheyeFilter(this, _bitMap));
                 break;
             case R.id.action_undo:
+                undoFilter();
                 break;
         }
 
@@ -130,8 +148,8 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         return super.onOptionsItemSelected(item);
     }
 
-    private void applyFilter(AbstractFilter filter) {
-
+    private void applyFilter(AbstractFilter filter)
+    {
         (new FilterTask()).execute(filter, this, _bitMap);
     }
 
@@ -145,7 +163,7 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         try {
 
             stream = getContentResolver().openInputStream(data);
-            setBitmap(BitmapFactory.decodeStream(stream));
+            setBitmap(BitmapFactory.decodeStream(stream), true);
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -160,8 +178,19 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
         }
     }
 
-    private void setBitmap(Bitmap bm)
+    private void undoFilter()
     {
+        setBitmap(_imageManager.pullBitmapFromCache(), false);
+    }
+
+    private void setBitmap(Bitmap bm, boolean resetCache)
+    {
+        if (resetCache)
+        {
+            _imageManager.clearCache();
+        }
+        if (_bitMap != null)_imageManager.pushBitmapToCache(_bitMap);
+
         _bitMap = bm;
         _imageView.setImageBitmap(_bitMap);
 
@@ -187,6 +216,8 @@ public class MainActivity extends ActionBarActivity implements FilterListener {
 
     @Override
     public void onComplete(Allocation result) {
+        if (_bitMap != null)_imageManager.pushBitmapToCache(_bitMap);
+
         result.copyTo(_bitMap);
         _imageView.setImageBitmap(_bitMap);
         updateView();
